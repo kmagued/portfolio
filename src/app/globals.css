@@ -1,0 +1,65 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0a0a;
+  --bg-card: #111111;
+  --text: #f0efe9;
+  --text-dim: #8a8a8a;
+  --accent: #e8ff47;
+  --accent2: #ff5733;
+  --accent3: #33c9ff;
+  --border: #222;
+  --radius: 16px;
+}
+
+html { scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: var(--accent) var(--bg); }
+
+body {
+  font-family: "Outfit", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.font-display { font-family: "Bebas Neue", cursive; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+.animate-slideUp { animation: slideUp 0.8s ease-out; }
+@keyframes floatSlow { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-20px) rotate(10deg); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes spinSlow { to { transform: rotate(360deg); } }
+@keyframes spinSlowReverse { to { transform: rotate(-360deg); } }
+
+.reveal { opacity: 0; transform: translateY(40px); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* Status badges */
+.status-badge { padding: 4px 12px; border-radius: 100px; font-size: 0.72rem; font-weight: 600; text-transform: capitalize; }
+.status-new { background: rgba(59,130,246,0.1); color: #3b82f6; }
+.status-contacted { background: rgba(168,85,247,0.1); color: #a855f7; }
+.status-in_progress { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.status-accepted, .status-completed { background: rgba(16,185,129,0.1); color: #10b981; }
+.status-declined, .status-cancelled { background: rgba(239,68,68,0.1); color: #ef4444; }
+.status-planning { background: rgba(100,116,139,0.1); color: #64748b; }
+.status-on_hold { background: rgba(245,158,11,0.1); color: #f59e0b; }
