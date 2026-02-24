@@ -2,25 +2,26 @@ import Image from "next/image";
 import Link from "next/link";
 import QuoteForm from "@/components/QuoteForm";
 import ScrollReveal from "@/components/ScrollReveal";
-import { projects } from "@/data/projects";
+import Nav from "@/components/Nav";
+import { supabase } from "@/lib/supabase";
+import type { Project } from "@/types/database";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const { data } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("published", true)
+    .order("display_order");
+  const projects = (data || []) as Project[];
+
   return (
     <>
       <ScrollReveal />
 
       {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] px-6 md:px-10 py-5 flex justify-between items-center backdrop-blur-xl bg-[#0a0a0a]/70 border-b border-[var(--border)]">
-        <a href="#" className="font-display text-[1.6rem] tracking-[3px] text-[var(--accent)]">SPORT × CODE</a>
-        <div className="hidden md:flex gap-8">
-          {["About", "Projects", "Stack", "Contact"].map((l) => (
-            <a key={l} href={`#${l.toLowerCase()}`} className="text-[var(--text-dim)] text-xs font-medium tracking-[1.5px] uppercase hover:text-[var(--text)] transition-colors relative group">
-              {l}
-              <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[var(--accent)] group-hover:w-full transition-all duration-300" />
-            </a>
-          ))}
-        </div>
-      </nav>
+      <Nav />
 
       {/* HERO */}
       <section className="min-h-screen relative overflow-hidden">
@@ -44,7 +45,7 @@ export default function Home() {
         <div className="relative z-10 min-h-screen grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-0 px-7 md:px-[60px] pt-32 md:pt-36 pb-16 items-center">
 
           {/* LEFT: Text content */}
-          <div className="flex flex-col justify-center order-2 lg:order-1">
+          <div className="flex flex-col justify-center">
             <div className="inline-flex items-center gap-2.5 text-xs font-semibold tracking-[3px] uppercase text-[var(--accent)] mb-6 opacity-0 animate-slideUp" style={{ animationDelay: "0.2s", animationFillMode: "forwards" }}>
               <span className="w-10 h-[2px] bg-[var(--accent)]" /> Software Developer × Sports Enthusiast
             </div>
@@ -82,7 +83,7 @@ export default function Home() {
           </div>
 
           {/* RIGHT: Photo composition */}
-          <div className="flex items-center justify-center order-1 lg:order-2 relative opacity-0 animate-slideUp" style={{ animationDelay: "0.4s", animationFillMode: "forwards" }}>
+          <div className="flex items-center justify-center relative opacity-0 animate-slideUp" style={{ animationDelay: "0.4s", animationFillMode: "forwards" }}>
             <div className="relative w-[320px] h-[420px] md:w-[420px] md:h-[540px] lg:w-[480px] lg:h-[600px]">
               {/* Decorative rings */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] h-[85%] rounded-full border border-[var(--accent)]/[0.08] animate-[spinSlow_30s_linear_infinite]" />
@@ -322,29 +323,28 @@ export default function Home() {
 }
 
 /* Project Card Component */
-function ProjectCard({ project, reversed }: { project: typeof import("@/data/projects").projects[number]; reversed?: boolean }) {
-  const { slug, number, name, desc, tags, features, links, cover } = project;
+function ProjectCard({ project, reversed }: { project: Project; reversed?: boolean }) {
+  const { slug, name, description, tags, features, links, cover_image } = project;
 
   return (
     <Link href={`/projects/${slug}`} className="block">
       <div className={`reveal grid grid-cols-1 lg:grid-cols-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--accent)] hover:-translate-y-1 hover:shadow-[0_30px_80px_rgba(0,0,0,0.4)] transition-all duration-500 cursor-pointer`}>
-        <div className={`p-8 md:p-12 flex flex-col justify-center relative ${reversed ? "lg:order-2" : ""}`}>
-          <div className="absolute top-5 right-8 font-display text-[5rem] text-[var(--accent)]/[0.08] leading-none">{number}</div>
-          <h3 className="font-display text-[clamp(2.4rem,3.5vw,3.2rem)] tracking-wide leading-tight mb-3.5">{name}</h3>
-          <p className="text-[var(--text-dim)] font-light leading-relaxed mb-7">{desc}</p>
-          <div className="flex flex-wrap gap-2 mb-7">
+        <div className={`p-6 md:p-12 flex flex-col justify-center relative ${reversed ? "lg:order-2" : ""}`}>
+          <h3 className="font-display text-[clamp(2.4rem,3.5vw,3.2rem)] tracking-wide leading-tight mb-3">{name}</h3>
+          <p className="text-[var(--text-dim)] font-light leading-relaxed mb-5 md:mb-7">{description}</p>
+          <div className="flex flex-wrap gap-2 mb-5 md:mb-7">
             {tags.map((t) => (
               <span key={t} className="px-3.5 py-1 bg-white/[0.04] border border-[var(--border)] rounded-full text-[0.72rem] font-medium text-[var(--text-dim)]">{t}</span>
             ))}
           </div>
-          <div className="flex flex-col gap-2.5 mb-6">
+          <div className="hidden md:flex flex-col gap-2.5 mb-6">
             {features.map((f) => (
               <div key={f} className="flex items-center gap-2.5 text-sm text-[var(--text-dim)]">
                 <span className="w-[18px] h-[18px] rounded-full bg-[var(--accent)]/10 flex items-center justify-center text-[0.6rem] text-[var(--accent)] shrink-0">&#10003;</span>{f}
               </div>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2.5 pt-5 border-t border-[var(--border)]">
+          <div className="flex flex-wrap gap-2.5 pt-4 md:pt-5 border-t border-[var(--border)]">
             {links.map((l) => (
               <span key={l.href} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--accent)]/[0.04] border border-[var(--accent)]/[0.12] rounded-full text-xs font-medium text-[var(--accent)]">
                 <i className={`${l.icon.includes("fa-brands") ? "" : "fa-solid "}${l.icon} text-[0.7rem]`} />{l.label}
@@ -352,13 +352,11 @@ function ProjectCard({ project, reversed }: { project: typeof import("@/data/pro
             ))}
           </div>
         </div>
-        <div className={`relative overflow-hidden min-h-[320px] ${reversed ? "lg:order-1" : ""}`}>
-          {cover ? (
-            <Image src={cover} alt={name} fill className="object-cover object-top hover:scale-[1.03] transition-transform duration-500" />
+        <div className={`hidden lg:block relative overflow-hidden min-h-[320px] ${reversed ? "lg:order-1" : ""}`}>
+          {cover_image ? (
+            <Image src={cover_image} alt={name} fill className="object-cover object-top hover:scale-[1.03] transition-transform duration-500" />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#111] to-[#1a1a1a] flex items-center justify-center">
-              <span className="font-display text-[4rem] text-[var(--accent)]/[0.08]">{number}</span>
-            </div>
+            <div className="w-full h-full bg-gradient-to-br from-[#111] to-[#1a1a1a]" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-card)]/50 via-transparent to-transparent" />
         </div>

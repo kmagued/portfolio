@@ -2,6 +2,7 @@ export type QuoteStatus = "new" | "contacted" | "in_progress" | "accepted" | "de
 export type ProjectStatus = "planning" | "in_progress" | "on_hold" | "completed" | "cancelled";
 export type ExpenseCategory = "hosting" | "tools" | "marketing" | "salary" | "equipment" | "general" | "other";
 export type IncomeSource = "project" | "freelance" | "subscription" | "other";
+export type Currency = "EGP" | "USD" | "EUR";
 
 export interface Quote {
   id: string;
@@ -17,17 +18,32 @@ export interface Quote {
   updated_at: string;
 }
 
+export interface ProjectLink {
+  href: string;
+  icon: string;
+  label: string;
+}
+
 export interface Project {
   id: string;
   name: string;
+  slug: string;
   client: string | null;
   description: string | null;
   status: ProjectStatus;
   budget: number | null;
+  currency: Currency;
   paid: number;
   start_date: string | null;
   end_date: string | null;
   quote_id: string | null;
+  tags: string[];
+  features: string[];
+  tech: string[];
+  links: ProjectLink[];
+  cover_image: string | null;
+  published: boolean;
+  display_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +52,7 @@ export interface Expense {
   id: string;
   title: string;
   amount: number;
+  currency: Currency;
   category: ExpenseCategory;
   date: string;
   project_id: string | null;
@@ -48,6 +65,7 @@ export interface Income {
   id: string;
   title: string;
   amount: number;
+  currency: Currency;
   source: IncomeSource;
   date: string;
   project_id: string | null;

@@ -63,3 +63,17 @@ body::after {
 .status-declined, .status-cancelled { background: rgba(239,68,68,0.1); color: #ef4444; }
 .status-planning { background: rgba(100,116,139,0.1); color: #64748b; }
 .status-on_hold { background: rgba(245,158,11,0.1); color: #f59e0b; }
+
+/* Admin dashboard */
+.admin-card { background: #111; border: 1px solid #222; border-radius: 12px; padding: 1.5rem; }
+.admin-stat { background: #111; border: 1px solid #222; border-radius: 12px; padding: 1.25rem; }
+.admin-stat.green { border-left: 2px solid #22c55e; }
+.admin-stat.red { border-left: 2px solid #ef4444; }
+.admin-stat.blue { border-left: 2px solid #3b82f6; }
+.admin-stat.purple { border-left: 2px solid #a855f7; }
+.admin-stat.yellow { border-left: 2px solid var(--accent); }
+
+.admin-table { width: 100%; font-size: 0.875rem; border-collapse: collapse; }
+.admin-table th { text-align: left; color: var(--text-dim); font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 0.75rem; border-bottom: 1px solid #222; }
+.admin-table td { padding: 0.75rem 0; border-bottom: 1px solid #1a1a1a; }
+.admin-table tr:last-child td { border-bottom: none; }

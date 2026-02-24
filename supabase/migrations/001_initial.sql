@@ -18,18 +18,27 @@ CREATE TABLE IF NOT EXISTS quotes (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Projects table (for admin tracking)
+-- Projects table (admin tracking + portfolio display)
 CREATE TABLE IF NOT EXISTS projects (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
+  slug TEXT UNIQUE,
   client TEXT,
   description TEXT,
   status TEXT DEFAULT 'planning' CHECK (status IN ('planning', 'in_progress', 'on_hold', 'completed', 'cancelled')),
   budget NUMERIC(12, 2),
+  currency TEXT DEFAULT 'EGP' CHECK (currency IN ('EGP', 'USD', 'EUR')),
   paid NUMERIC(12, 2) DEFAULT 0,
   start_date DATE,
   end_date DATE,
   quote_id UUID REFERENCES quotes(id) ON DELETE SET NULL,
+  tags TEXT[] DEFAULT '{}',
+  features TEXT[] DEFAULT '{}',
+  tech TEXT[] DEFAULT '{}',
+  links JSONB DEFAULT '[]',
+  cover_image TEXT,
+  published BOOLEAN DEFAULT FALSE,
+  display_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -39,6 +48,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
   amount NUMERIC(12, 2) NOT NULL,
+  currency TEXT DEFAULT 'EGP' CHECK (currency IN ('EGP', 'USD', 'EUR')),
   category TEXT DEFAULT 'general' CHECK (category IN ('hosting', 'tools', 'marketing', 'salary', 'equipment', 'general', 'other')),
   date DATE DEFAULT CURRENT_DATE,
   project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
@@ -52,6 +62,7 @@ CREATE TABLE IF NOT EXISTS income (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
   amount NUMERIC(12, 2) NOT NULL,
+  currency TEXT DEFAULT 'EGP' CHECK (currency IN ('EGP', 'USD', 'EUR')),
   source TEXT DEFAULT 'project' CHECK (source IN ('project', 'freelance', 'subscription', 'other')),
   date DATE DEFAULT CURRENT_DATE,
   project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
@@ -83,7 +94,7 @@ ALTER TABLE income ENABLE ROW LEVEL SECURITY;
 
 -- Public can INSERT quotes (from portfolio form)
 CREATE POLICY "Anyone can submit quotes" ON quotes
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT TO anon WITH CHECK (true);
 
 -- Only authenticated users can read/update/delete
 CREATE POLICY "Auth users can view quotes" ON quotes
@@ -98,6 +109,9 @@ CREATE POLICY "Auth users can delete quotes" ON quotes
 -- Auth-only for projects, expenses, income
 CREATE POLICY "Auth users full access projects" ON projects
   FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public can view published projects" ON projects
+  FOR SELECT TO anon USING (published = true);
 
 CREATE POLICY "Auth users full access expenses" ON expenses
   FOR ALL USING (auth.role() = 'authenticated');

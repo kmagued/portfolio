@@ -10,15 +10,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("quotes")
-      .insert({ name, email, project_types, budget, timeline, description } as never)
-      .select()
-      .single();
+      .insert({ name, email, project_types, budget, timeline, description } as never);
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, data }, { status: 201 });
+    return NextResponse.json({ success: true }, { status: 201 });
   } catch (error: any) {
     console.error("Quote submission error:", error);
     return NextResponse.json({ error: "Failed to submit quote" }, { status: 500 });
