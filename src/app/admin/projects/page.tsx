@@ -42,7 +42,9 @@ export default function AdminProjects() {
             <div className="flex justify-between items-start mb-3">
               <div>
                 <div className="font-medium text-[var(--text)]">{p.name}</div>
-                {p.client && <div className="text-sm text-[var(--text-dim)]">{p.client}</div>}
+                <div className="text-xs text-[var(--text-dim)] mt-0.5">
+                  {p.client ? <><i className="fa-solid fa-user mr-1" />{p.client}</> : <><i className="fa-solid fa-code mr-1" />Personal Project</>}
+                </div>
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-3">
                 {p.published && (
@@ -65,7 +67,7 @@ export default function AdminProjects() {
 
             <div className="mt-auto pt-3 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-dim)]">
               <span>{p.start_date || "No start date"}</span>
-              {p.budget && <span className="text-[var(--text)]">{Number(p.budget).toLocaleString()} {p.currency || "EGP"}</span>}
+              {p.client && <span><span className="text-[var(--text-dim)]">Paid </span><span className="text-[var(--text)]">{Number(p.paid || 0).toLocaleString()} {p.currency || "EGP"}</span></span>}
             </div>
           </Link>
         ))}

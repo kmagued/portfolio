@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Expense, Income, Currency, IncomeSource, Project } from "@/types/database";
 import SlidePanel from "@/components/SlidePanel";
@@ -49,11 +49,12 @@ export default function AdminFinances() {
   // Income-only
   const [source, setSource] = useState<IncomeSource>("project");
 
-  // Filters
+  // Filters (global)
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterProject, setFilterProject] = useState("all");
-  const [filterCategory, setFilterCategory] = useState("all");
-  const [filterSource, setFilterSource] = useState("all");
+  // Section-level filters (empty array = all)
+  const [filterCategories, setFilterCategories] = useState<string[]>([]);
+  const [filterSources, setFilterSources] = useState<string[]>([]);
 
   // Sort
   const [sortField, setSortField] = useState<SortField>("date");
@@ -127,14 +128,12 @@ export default function AdminFinances() {
   }, [expenses, income]);
 
   // Filter + sort helpers
-  const matchesFilters = (item: { date: string; project_id: string | null }, type: "expense" | "income", extra?: { category?: string; source?: string }) => {
+  const matchesFilters = (item: { date: string; project_id: string | null }) => {
     if (filterMonth !== "all" && (!item.date || !item.date.startsWith(filterMonth))) return false;
     if (filterProject !== "all") {
       if (filterProject === "none" && item.project_id) return false;
       if (filterProject !== "none" && item.project_id !== filterProject) return false;
     }
-    if (type === "expense" && filterCategory !== "all" && extra?.category !== filterCategory) return false;
-    if (type === "income" && filterSource !== "all" && extra?.source !== filterSource) return false;
     return true;
   };
 
@@ -150,13 +149,21 @@ export default function AdminFinances() {
 
   const filteredExpenses = useMemo(() => {
     setExpensePage(1);
-    return sortItems(expenses.filter((e) => matchesFilters(e, "expense", { category: e.category })));
-  }, [expenses, filterMonth, filterProject, filterCategory, sortField, sortDir]);
+    return sortItems(expenses.filter((e) => {
+      if (!matchesFilters(e)) return false;
+      if (filterCategories.length > 0 && !filterCategories.includes(e.category)) return false;
+      return true;
+    }));
+  }, [expenses, filterMonth, filterProject, filterCategories, sortField, sortDir]);
 
   const filteredIncome = useMemo(() => {
     setIncomePage(1);
-    return sortItems(income.filter((i) => matchesFilters(i, "income", { source: i.source })));
-  }, [income, filterMonth, filterProject, filterSource, sortField, sortDir]);
+    return sortItems(income.filter((i) => {
+      if (!matchesFilters(i)) return false;
+      if (filterSources.length > 0 && !filterSources.includes(i.source)) return false;
+      return true;
+    }));
+  }, [income, filterMonth, filterProject, filterSources, sortField, sortDir]);
 
   // Pagination
   const incomePages = Math.ceil(filteredIncome.length / PAGE_SIZE) || 1;
@@ -185,10 +192,10 @@ export default function AdminFinances() {
     return sortDir === "asc" ? "fa-sort-up text-[var(--accent)]" : "fa-sort-down text-[var(--accent)]";
   };
 
-  const hasActiveFilters = filterMonth !== "all" || filterProject !== "all" || filterCategory !== "all" || filterSource !== "all";
+  const hasActiveFilters = filterMonth !== "all" || filterProject !== "all";
 
   const clearFilters = () => {
-    setFilterMonth("all"); setFilterProject("all"); setFilterCategory("all"); setFilterSource("all");
+    setFilterMonth("all"); setFilterProject("all");
   };
 
   const fmtMonth = (ym: string) => {
@@ -322,16 +329,6 @@ export default function AdminFinances() {
             {projects.map((p) => <option key={p.id} value={p.id} className="bg-[#111]">{p.name}</option>)}
           </select>
 
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className={selectFilter}>
-            <option value="all" className="bg-[#111]">All Categories</option>
-            {categories.map((c) => <option key={c} value={c} className="bg-[#111]">{categoryLabels[c]}</option>)}
-          </select>
-
-          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className={selectFilter}>
-            <option value="all" className="bg-[#111]">All Sources</option>
-            {sources.map((s) => <option key={s} value={s} className="bg-[#111]">{sourceLabels[s]}</option>)}
-          </select>
-
           {hasActiveFilters && (
             <button onClick={clearFilters} className="ml-auto text-xs text-[var(--accent)] hover:text-white transition-colors">
               <i className="fa-solid fa-xmark mr-1" />Clear
@@ -376,22 +373,6 @@ export default function AdminFinances() {
               </select>
             </div>
 
-            <div>
-              <label className="text-xs text-[var(--text-dim)] uppercase tracking-wide font-semibold mb-1.5 block">Expense Category</label>
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className={inputClass}>
-                <option value="all" className="bg-[#111]">All Categories</option>
-                {categories.map((c) => <option key={c} value={c} className="bg-[#111]">{categoryLabels[c]}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs text-[var(--text-dim)] uppercase tracking-wide font-semibold mb-1.5 block">Income Source</label>
-              <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className={inputClass}>
-                <option value="all" className="bg-[#111]">All Sources</option>
-                {sources.map((s) => <option key={s} value={s} className="bg-[#111]">{sourceLabels[s]}</option>)}
-              </select>
-            </div>
-
             <div className="border-t border-[var(--border)] pt-4">
               <label className="text-xs text-[var(--text-dim)] uppercase tracking-wide font-semibold mb-1.5 block">Sort By</label>
               <div className="flex gap-2">
@@ -423,10 +404,18 @@ export default function AdminFinances() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Income */}
         <div>
-          <h3 className="font-display text-xl tracking-wide mb-4 text-green-400">
-            <i className="fa-solid fa-arrow-trend-up mr-2" />INCOME
-            <span className="text-sm font-sans text-[var(--text-dim)] ml-2">({filteredIncome.length})</span>
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display text-xl tracking-wide text-green-400">
+              <i className="fa-solid fa-arrow-trend-up mr-2" />INCOME
+              <span className="text-sm font-sans text-[var(--text-dim)] ml-2">({filteredIncome.length})</span>
+            </h3>
+            <MultiSelect
+              options={sources.map((s) => ({ value: s, label: sourceLabels[s] }))}
+              selected={filterSources}
+              onChange={setFilterSources}
+              placeholder="All Sources"
+            />
+          </div>
           <div className="hidden md:block admin-card">
             <div className="overflow-x-auto">
               <table className="admin-table">
@@ -439,6 +428,7 @@ export default function AdminFinances() {
                       Amount <i className={`fa-solid ${sortIcon("amount")} ml-1 text-[0.6rem]`} />
                     </th>
                     <th>Source</th>
+                    <th>Project</th>
                     <th className="cursor-pointer select-none" onClick={() => toggleSort("date")}>
                       Date <i className={`fa-solid ${sortIcon("date")} ml-1 text-[0.6rem]`} />
                     </th>
@@ -448,13 +438,26 @@ export default function AdminFinances() {
                   {paginatedIncome.map((i) => (
                     <tr key={i.id}>
                       <td className="font-medium">{i.title}</td>
-                      <td className="text-green-400 whitespace-nowrap">{fmtAmount(Number(i.amount), i.currency)}</td>
+                      <td className="text-green-400 whitespace-nowrap">
+                        {fmtAmount(Math.round(toBase(Number(i.amount), i.currency)), baseCurrency)}
+                        {i.currency !== baseCurrency && <div className="text-[0.65rem] text-[var(--text-dim)] font-normal">{fmtAmount(Number(i.amount), i.currency)}</div>}
+                      </td>
                       <td><span className="status-badge status-accepted">{sourceLabels[i.source] || i.source}</span></td>
+                      <td className="text-[var(--text-dim)] text-xs">{i.project_id ? projectMap[i.project_id] || "—" : "—"}</td>
                       <td className="text-[var(--text-dim)] text-xs">{i.date}</td>
                     </tr>
                   ))}
-                  {filteredIncome.length === 0 && <tr><td colSpan={4} className="text-center text-[var(--text-dim)] py-6">No income records.</td></tr>}
+                  {filteredIncome.length === 0 && <tr><td colSpan={5} className="text-center text-[var(--text-dim)] py-6">No income records.</td></tr>}
                 </tbody>
+                {filteredIncome.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-[var(--border)]">
+                      <td className="font-semibold text-xs uppercase tracking-wide text-[var(--text-dim)] py-3">Total</td>
+                      <td className="text-green-400 font-semibold whitespace-nowrap py-3">{fmtAmount(Math.round(totalIncome), baseCurrency)}</td>
+                      <td colSpan={3} />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
             {incomePages > 1 && (
@@ -482,16 +485,30 @@ export default function AdminFinances() {
           <div className="md:hidden flex flex-col gap-3">
             {paginatedIncome.map((i) => (
               <div key={i.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-medium text-sm">{i.title}</span>
-                  <span className="text-green-400 font-semibold text-sm">{fmtAmount(Number(i.amount), i.currency)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-[var(--text-dim)]">
-                  <span className="status-badge status-accepted">{sourceLabels[i.source] || i.source}</span>
-                  <span>{i.date}</span>
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate">{i.title}</span>
+                      <span className="status-badge status-accepted shrink-0">{sourceLabels[i.source] || i.source}</span>
+                    </div>
+                    <div className="text-[0.65rem] text-[var(--text-dim)] mt-1.5">{i.date}</div>
+                    {i.project_id && projectMap[i.project_id] && (
+                      <div className="text-[0.65rem] text-[var(--text-dim)] mt-1.5"><i className="fa-solid fa-folder-open mr-1" />{projectMap[i.project_id]}</div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-green-400 font-semibold text-sm">{fmtAmount(Math.round(toBase(Number(i.amount), i.currency)), baseCurrency)}</div>
+                    {i.currency !== baseCurrency && <div className="text-[0.6rem] text-[var(--text-dim)] mt-0.5">{fmtAmount(Number(i.amount), i.currency)}</div>}
+                  </div>
                 </div>
               </div>
             ))}
+            {filteredIncome.length > 0 && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex justify-between items-center">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">Total</span>
+                <span className="text-green-400 font-semibold text-sm">{fmtAmount(Math.round(totalIncome), baseCurrency)}</span>
+              </div>
+            )}
             {filteredIncome.length === 0 && <div className="text-center text-[var(--text-dim)] py-6">No income records.</div>}
             {incomePages > 1 && (
               <div className="flex items-center justify-between mt-1">
@@ -519,10 +536,18 @@ export default function AdminFinances() {
 
         {/* Expenses */}
         <div>
-          <h3 className="font-display text-xl tracking-wide mb-4 text-red-400">
-            <i className="fa-solid fa-arrow-trend-down mr-2" />EXPENSES
-            <span className="text-sm font-sans text-[var(--text-dim)] ml-2">({filteredExpenses.length})</span>
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display text-xl tracking-wide text-red-400">
+              <i className="fa-solid fa-arrow-trend-down mr-2" />EXPENSES
+              <span className="text-sm font-sans text-[var(--text-dim)] ml-2">({filteredExpenses.length})</span>
+            </h3>
+            <MultiSelect
+              options={categories.map((c) => ({ value: c, label: categoryLabels[c] }))}
+              selected={filterCategories}
+              onChange={setFilterCategories}
+              placeholder="All Categories"
+            />
+          </div>
           <div className="hidden md:block admin-card">
             <div className="overflow-x-auto">
               <table className="admin-table">
@@ -545,7 +570,10 @@ export default function AdminFinances() {
                   {paginatedExpenses.map((e) => (
                     <tr key={e.id}>
                       <td className="font-medium">{e.title}</td>
-                      <td className="text-red-400 whitespace-nowrap">{fmtAmount(Number(e.amount), e.currency)}</td>
+                      <td className="text-red-400 whitespace-nowrap">
+                        {fmtAmount(Math.round(toBase(Number(e.amount), e.currency)), baseCurrency)}
+                        {e.currency !== baseCurrency && <div className="text-[0.65rem] text-[var(--text-dim)] font-normal">{fmtAmount(Number(e.amount), e.currency)}</div>}
+                      </td>
                       <td><span className="status-badge status-declined">{categoryLabels[e.category] || e.category}</span></td>
                       <td className="text-[var(--text-dim)] text-xs">{e.project_id ? projectMap[e.project_id] || "—" : "—"}</td>
                       <td className="text-[var(--text-dim)] text-xs">{e.date}</td>
@@ -553,6 +581,15 @@ export default function AdminFinances() {
                   ))}
                   {filteredExpenses.length === 0 && <tr><td colSpan={5} className="text-center text-[var(--text-dim)] py-6">No expense records.</td></tr>}
                 </tbody>
+                {filteredExpenses.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-[var(--border)]">
+                      <td className="font-semibold text-xs uppercase tracking-wide text-[var(--text-dim)] py-3">Total</td>
+                      <td className="text-red-400 font-semibold whitespace-nowrap py-3">{fmtAmount(Math.round(totalExpenses), baseCurrency)}</td>
+                      <td colSpan={3} />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
             {expensePages > 1 && (
@@ -580,19 +617,30 @@ export default function AdminFinances() {
           <div className="md:hidden flex flex-col gap-3">
             {paginatedExpenses.map((e) => (
               <div key={e.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-medium text-sm">{e.title}</span>
-                  <span className="text-red-400 font-semibold text-sm">{fmtAmount(Number(e.amount), e.currency)}</span>
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate">{e.title}</span>
+                      <span className="status-badge status-declined shrink-0">{categoryLabels[e.category] || e.category}</span>
+                    </div>
+                    <div className="text-[0.65rem] text-[var(--text-dim)] mt-1.5">{e.date}</div>
+                    {e.project_id && projectMap[e.project_id] && (
+                      <div className="text-[0.65rem] text-[var(--text-dim)] mt-1.5"><i className="fa-solid fa-folder-open mr-1" />{projectMap[e.project_id]}</div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-red-400 font-semibold text-sm">{fmtAmount(Math.round(toBase(Number(e.amount), e.currency)), baseCurrency)}</div>
+                    {e.currency !== baseCurrency && <div className="text-[0.6rem] text-[var(--text-dim)] mt-0.5">{fmtAmount(Number(e.amount), e.currency)}</div>}
+                  </div>
                 </div>
-                <div className="flex justify-between text-xs text-[var(--text-dim)]">
-                  <span className="status-badge status-declined">{categoryLabels[e.category] || e.category}</span>
-                  <span>{e.date}</span>
-                </div>
-                {e.project_id && projectMap[e.project_id] && (
-                  <div className="text-xs text-[var(--text-dim)] mt-1"><i className="fa-solid fa-folder-open mr-1" />{projectMap[e.project_id]}</div>
-                )}
               </div>
             ))}
+            {filteredExpenses.length > 0 && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex justify-between items-center">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">Total</span>
+                <span className="text-red-400 font-semibold text-sm">{fmtAmount(Math.round(totalExpenses), baseCurrency)}</span>
+              </div>
+            )}
             {filteredExpenses.length === 0 && <div className="text-center text-[var(--text-dim)] py-6">No expense records.</div>}
             {expensePages > 1 && (
               <div className="flex items-center justify-between mt-1">
@@ -618,6 +666,63 @@ export default function AdminFinances() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MultiSelect({ options, selected, onChange, placeholder }: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (val: string) => {
+    onChange(selected.includes(val) ? selected.filter((v) => v !== val) : [...selected, val]);
+  };
+
+  const label = selected.length === 0
+    ? placeholder
+    : selected.length === 1
+      ? options.find((o) => o.value === selected[0])?.label || selected[0]
+      : `${selected.length} selected`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)}
+        className={`flex items-center gap-2 bg-white/[0.04] border rounded-lg px-3 py-2 text-sm transition-colors ${selected.length > 0 ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"}`}>
+        {label}
+        <i className={`fa-solid fa-chevron-down text-[0.5rem] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-[#1a1a1a] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
+          {options.map((o) => (
+            <button key={o.value} onClick={() => toggle(o.value)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-white/[0.04] transition-colors">
+              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${selected.includes(o.value) ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border)]"}`}>
+                {selected.includes(o.value) && <i className="fa-solid fa-check text-[0.5rem] text-[#0a0a0a]" />}
+              </span>
+              <span className={selected.includes(o.value) ? "text-[var(--text)]" : "text-[var(--text-dim)]"}>{o.label}</span>
+            </button>
+          ))}
+          {selected.length > 0 && (
+            <button onClick={() => onChange([])}
+              className="w-full px-3 py-2 text-xs text-[var(--accent)] border-t border-[var(--border)] hover:bg-white/[0.04] transition-colors">
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
