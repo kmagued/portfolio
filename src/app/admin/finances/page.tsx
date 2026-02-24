@@ -111,7 +111,7 @@ export default function AdminFinances() {
       } as never);
       // Add income amount to project's paid total
       if (projectId) {
-        const { data: proj } = await supabase.from("projects").select("paid, currency").eq("id", projectId).single();
+        const { data: proj } = await supabase.from("projects").select("paid, currency").eq("id", projectId).single() as { data: { paid: number; currency: string } | null };
         const currentPaid = Number(proj?.paid || 0);
         const projCurrency = proj?.currency || "EGP";
         let added = parseFloat(amount);
@@ -135,7 +135,7 @@ export default function AdminFinances() {
     [...expenses, ...income].forEach((item) => {
       if (item.date) monthSet.add(item.date.slice(0, 7));
     });
-    return [...monthSet].sort().reverse();
+    return Array.from(monthSet).sort().reverse();
   }, [expenses, income]);
 
   // Filter + sort helpers
