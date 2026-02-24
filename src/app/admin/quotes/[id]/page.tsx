@@ -24,7 +24,7 @@ export default function QuoteDetail() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.from("quotes").select("*").eq("id", id).single().then(({ data }) => {
+    supabase.from("quotes").select("*").eq("id", id).single().then(({ data }: { data: Quote | null }) => {
       if (data) {
         setQuote(data);
         setNotes(data.notes || "");

@@ -106,7 +106,7 @@ export default function NewProject() {
       cover_image: coverImage || null,
       published,
       display_order: parseInt(displayOrder) || 0,
-    } as never).select("id").single();
+    } as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null };
     setSaving(false);
     if (data) router.push(`/admin/projects/${data.id}`);
     else if (error) alert(error.message);

@@ -22,7 +22,7 @@ export default function AdminProjects() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    supabase.from("projects").select("*").order("display_order").then(({ data }) => {
+    supabase.from("projects").select("*").order("display_order").then(({ data }: { data: Project[] | null }) => {
       if (data) setProjects([...data].sort((a, b) => (a.client ? 0 : 1) - (b.client ? 0 : 1)));
     });
   }, []);
