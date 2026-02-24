@@ -69,7 +69,7 @@ export default function AdminFinances() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Shared currency context
-  const { baseCurrency, toBase } = useCurrency();
+  const { baseCurrency, rates, toBase } = useCurrency();
 
   const loadData = async () => {
     const [e, i, p] = await Promise.all([
@@ -109,6 +109,17 @@ export default function AdminFinances() {
         title, amount: parseFloat(amount), currency, source, date,
         project_id: projectId || null, notes: notes || null,
       } as never);
+      // Add income amount to project's paid total
+      if (projectId) {
+        const { data: proj } = await supabase.from("projects").select("paid, currency").eq("id", projectId).single();
+        const currentPaid = Number(proj?.paid || 0);
+        const projCurrency = proj?.currency || "EGP";
+        let added = parseFloat(amount);
+        if (rates && currency !== projCurrency) {
+          added = (added / (rates[currency] || 1)) * (rates[projCurrency] || 1);
+        }
+        await supabase.from("projects").update({ paid: Math.round(currentPaid + added) } as never).eq("id", projectId);
+      }
     }
     setSaving(false);
     resetForm();

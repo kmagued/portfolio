@@ -66,7 +66,7 @@ export default function AdminProjects() {
             )}
 
             <div className="mt-auto pt-3 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-dim)]">
-              <span>{p.start_date || "No start date"}</span>
+              <span>{p.start_date ? new Date(p.start_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "No start date"}</span>
               {p.client && <span><span className="text-[var(--text-dim)]">Paid </span><span className="text-[var(--text)]">{Number(p.paid || 0).toLocaleString()} {p.currency || "EGP"}</span></span>}
             </div>
           </Link>
