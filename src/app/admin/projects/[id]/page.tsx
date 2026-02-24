@@ -47,7 +47,7 @@ export default function ProjectDetail() {
   const [links, setLinks] = useState<ProjectLink[]>([]);
 
   useEffect(() => {
-    supabase.from("projects").select("*").eq("id", id).single().then(({ data }) => {
+    supabase.from("projects").select("*").eq("id", id).single().then(({ data }: { data: Project | null }) => {
       if (data) {
         setProject(data);
         setName(data.name);
