@@ -311,7 +311,7 @@ export default function NewProject() {
           {/* Submit */}
           <button onClick={handleSubmit} disabled={!name || !slug || saving}
             className="w-full py-3 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm tracking-wider uppercase hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            {saving ? "Creating..." : "Create Project"}
+            {saving ? (<span className="flex items-center justify-center gap-2"><i className="fa-solid fa-spinner fa-spin text-xs" /> Creating...</span>) : "Create Project"}
           </button>
         </div>
       </div>

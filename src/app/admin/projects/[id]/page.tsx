@@ -354,7 +354,7 @@ export default function ProjectDetail() {
         </button>
         <button onClick={handleSave} disabled={!name || !slug || saving}
           className="px-8 py-2.5 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm tracking-wider uppercase hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? (<span className="flex items-center justify-center gap-2"><i className="fa-solid fa-spinner fa-spin text-xs" /> Saving...</span>) : "Save Changes"}
         </button>
       </div>
 

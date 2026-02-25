@@ -35,6 +35,9 @@ export default function AdminFinances() {
   const [showForm, setShowForm] = useState(false);
   const [formType, setFormType] = useState<FormType>("expense");
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Shared form state
   const [title, setTitle] = useState("");
@@ -87,7 +90,7 @@ export default function AdminFinances() {
   const resetForm = () => {
     setTitle(""); setAmount(""); setCurrency("EGP"); setCategory("general");
     setDate(new Date().toISOString().split("T")[0]); setProjectId(""); setNotes("");
-    setRecurring(false); setSource("project");
+    setRecurring(false); setSource("project"); setEditingId(null);
   };
 
   const openForm = (type: FormType) => {
@@ -96,32 +99,125 @@ export default function AdminFinances() {
     setShowForm(true);
   };
 
+  const openEditIncome = (item: Income) => {
+    setEditingId(item.id);
+    setFormType("income");
+    setTitle(item.title);
+    setAmount(String(item.amount));
+    setCurrency(item.currency);
+    setSource(item.source);
+    setDate(item.date);
+    setProjectId(item.project_id || "");
+    setNotes(item.notes || "");
+    setShowForm(true);
+  };
+
+  const openEditExpense = (item: Expense) => {
+    setEditingId(item.id);
+    setFormType("expense");
+    setTitle(item.title);
+    setAmount(String(item.amount));
+    setCurrency(item.currency);
+    setCategory(item.category);
+    setDate(item.date);
+    setProjectId(item.project_id || "");
+    setNotes(item.notes || "");
+    setRecurring(item.recurring);
+    setShowForm(true);
+  };
+
   const handleSubmit = async () => {
     if (!title || !amount) return;
     setSaving(true);
-    if (formType === "expense") {
-      await supabase.from("expenses").insert({
-        title, amount: parseFloat(amount), currency, category, date,
-        project_id: projectId || null, notes: notes || null, recurring,
-      } as never);
-    } else {
-      await supabase.from("income").insert({
-        title, amount: parseFloat(amount), currency, source, date,
-        project_id: projectId || null, notes: notes || null,
-      } as never);
-      // Add income amount to project's paid total
-      if (projectId) {
-        const { data: proj } = await supabase.from("projects").select("paid, currency").eq("id", projectId).single() as { data: { paid: number; currency: string } | null };
-        const currentPaid = Number(proj?.paid || 0);
-        const projCurrency = proj?.currency || "EGP";
-        let added = parseFloat(amount);
-        if (rates && currency !== projCurrency) {
-          added = (added / (rates[currency] || 1)) * (rates[projCurrency] || 1);
+
+    if (editingId) {
+      if (formType === "expense") {
+        await supabase.from("expenses").update({
+          title, amount: parseFloat(amount), currency, category, date,
+          project_id: projectId || null, notes: notes || null, recurring,
+        } as never).eq("id", editingId);
+      } else {
+        // Reverse old project paid adjustment
+        const original = income.find((i) => i.id === editingId);
+        if (original?.project_id) {
+          const { data: oldProj } = await supabase.from("projects").select("paid, currency").eq("id", original.project_id).single() as { data: { paid: number; currency: string } | null };
+          if (oldProj) {
+            let oldConverted = Number(original.amount);
+            if (rates && original.currency !== oldProj.currency) {
+              oldConverted = (oldConverted / (rates[original.currency] || 1)) * (rates[oldProj.currency] || 1);
+            }
+            await supabase.from("projects").update({ paid: Math.round(Number(oldProj.paid) - oldConverted) } as never).eq("id", original.project_id);
+          }
         }
-        await supabase.from("projects").update({ paid: Math.round(currentPaid + added) } as never).eq("id", projectId);
+        await supabase.from("income").update({
+          title, amount: parseFloat(amount), currency, source, date,
+          project_id: projectId || null, notes: notes || null,
+        } as never).eq("id", editingId);
+        // Apply new project paid adjustment
+        if (projectId) {
+          const { data: proj } = await supabase.from("projects").select("paid, currency").eq("id", projectId).single() as { data: { paid: number; currency: string } | null };
+          const currentPaid = Number(proj?.paid || 0);
+          const projCurrency = proj?.currency || "EGP";
+          let added = parseFloat(amount);
+          if (rates && currency !== projCurrency) {
+            added = (added / (rates[currency] || 1)) * (rates[projCurrency] || 1);
+          }
+          await supabase.from("projects").update({ paid: Math.round(currentPaid + added) } as never).eq("id", projectId);
+        }
+      }
+    } else {
+      if (formType === "expense") {
+        await supabase.from("expenses").insert({
+          title, amount: parseFloat(amount), currency, category, date,
+          project_id: projectId || null, notes: notes || null, recurring,
+        } as never);
+      } else {
+        await supabase.from("income").insert({
+          title, amount: parseFloat(amount), currency, source, date,
+          project_id: projectId || null, notes: notes || null,
+        } as never);
+        if (projectId) {
+          const { data: proj } = await supabase.from("projects").select("paid, currency").eq("id", projectId).single() as { data: { paid: number; currency: string } | null };
+          const currentPaid = Number(proj?.paid || 0);
+          const projCurrency = proj?.currency || "EGP";
+          let added = parseFloat(amount);
+          if (rates && currency !== projCurrency) {
+            added = (added / (rates[currency] || 1)) * (rates[projCurrency] || 1);
+          }
+          await supabase.from("projects").update({ paid: Math.round(currentPaid + added) } as never).eq("id", projectId);
+        }
       }
     }
+
     setSaving(false);
+    resetForm();
+    setShowForm(false);
+    loadData();
+  };
+
+  const handleDelete = async () => {
+    if (!editingId) return;
+    setDeleting(true);
+
+    if (formType === "income") {
+      // Reverse project paid adjustment before deleting
+      const original = income.find((i) => i.id === editingId);
+      if (original?.project_id) {
+        const { data: proj } = await supabase.from("projects").select("paid, currency").eq("id", original.project_id).single() as { data: { paid: number; currency: string } | null };
+        if (proj) {
+          let oldConverted = Number(original.amount);
+          if (rates && original.currency !== proj.currency) {
+            oldConverted = (oldConverted / (rates[original.currency] || 1)) * (rates[proj.currency] || 1);
+          }
+          await supabase.from("projects").update({ paid: Math.round(Number(proj.paid) - oldConverted) } as never).eq("id", original.project_id);
+        }
+      }
+      await supabase.from("income").delete().eq("id", editingId);
+    } else {
+      await supabase.from("expenses").delete().eq("id", editingId);
+    }
+
+    setDeleting(false);
     resetForm();
     setShowForm(false);
     loadData();
@@ -215,18 +311,56 @@ export default function AdminFinances() {
     return `${months[parseInt(m) - 1]} ${y}`;
   };
 
+  // Compact pagination helper
+  const getVisiblePages = (current: number, total: number): (number | "...")[] => {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 3) return [1, 2, 3, 4, "...", total];
+    if (current >= total - 2) return [1, "...", total - 3, total - 2, total - 1, total];
+    return [1, "...", current - 1, current, current + 1, "...", total];
+  };
+
+  const renderPagination = (currentPage: number, totalPages: number, setPage: (v: number | ((p: number) => number)) => void) => {
+    if (totalPages <= 1) return null;
+    const visible = getVisiblePages(currentPage, totalPages);
+    return (
+      <div className="flex items-center justify-between mt-3 px-1">
+        <span className="text-xs text-[var(--text-dim)]">Page {currentPage} of {totalPages}</span>
+        <div className="flex gap-1">
+          <button onClick={() => setPage((p: number) => Math.max(1, p - 1))} disabled={currentPage === 1}
+            className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
+            <i className="fa-solid fa-chevron-left" />
+          </button>
+          {visible.map((p, idx) =>
+            p === "..." ? (
+              <span key={`dots-${idx}`} className="w-6 h-8 flex items-center justify-center text-xs text-[var(--text-dim)]">…</span>
+            ) : (
+              <button key={p} onClick={() => setPage(p as number)}
+                className={`w-8 h-8 rounded-lg border text-xs transition-colors ${currentPage === p ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)]"}`}>
+                {p}
+              </button>
+            )
+          )}
+          <button onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+            className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
+            <i className="fa-solid fa-chevron-right" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const inputClass = "w-full bg-white/[0.04] border border-[var(--border)] rounded-lg px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-white/20";
   const selectFilter = "bg-white/[0.04] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors";
   const isExpense = formType === "expense";
 
   return (
-    <div>
+    <div className="pb-24 md:pb-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="font-display text-4xl tracking-wide mb-2">FINANCES</h1>
           <p className="text-sm text-[var(--text-dim)]">Track income and expenses across all projects.</p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="hidden md:flex gap-2 shrink-0">
           <button onClick={() => openForm("income")}
             className="px-5 py-2.5 rounded-lg border border-green-500/20 text-green-400 font-semibold text-sm tracking-wider uppercase hover:bg-green-500/5 transition-colors">
             <i className="fa-solid fa-plus mr-2" />Add Income
@@ -238,8 +372,8 @@ export default function AdminFinances() {
         </div>
       </div>
 
-      {/* Add Entry Slide Panel */}
-      <SlidePanel open={showForm} onClose={() => setShowForm(false)} title={isExpense ? "NEW EXPENSE" : "NEW INCOME"}>
+      {/* Add/Edit Entry Slide Panel */}
+      <SlidePanel open={showForm} onClose={() => { setShowForm(false); resetForm(); }} title={editingId ? (isExpense ? "EDIT EXPENSE" : "EDIT INCOME") : (isExpense ? "NEW EXPENSE" : "NEW INCOME")}>
         <div className="space-y-4">
           <div>
             <label className="text-xs text-[var(--text-dim)] uppercase tracking-wide font-semibold mb-1.5 block">Title</label>
@@ -295,14 +429,30 @@ export default function AdminFinances() {
               Recurring expense
             </label>
           )}
-          <button onClick={handleSubmit} disabled={!title || !amount || saving}
+          <button onClick={handleSubmit} disabled={!title || !amount || saving || deleting}
             className={`w-full py-3 rounded-lg font-semibold text-sm tracking-wider uppercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               isExpense
                 ? "bg-[var(--accent)] text-[#0a0a0a] hover:bg-white"
                 : "bg-green-500 text-[#0a0a0a] hover:bg-green-400"
             }`}>
-            {saving ? "Saving..." : isExpense ? "Save Expense" : "Save Income"}
+            {saving ? (
+              <span className="flex items-center justify-center gap-2">
+                <i className="fa-solid fa-spinner fa-spin text-xs" /> Saving...
+              </span>
+            ) : editingId ? (isExpense ? "Update Expense" : "Update Income") : (isExpense ? "Save Expense" : "Save Income")}
           </button>
+          {editingId && (
+            <button onClick={handleDelete} disabled={saving || deleting}
+              className="w-full py-3 rounded-lg border border-red-500/20 text-red-400 font-semibold text-sm tracking-wider uppercase hover:bg-red-500/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              {deleting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <i className="fa-solid fa-spinner fa-spin text-xs" /> Deleting...
+                </span>
+              ) : (
+                <span><i className="fa-solid fa-trash mr-2 text-xs" />Delete {isExpense ? "Expense" : "Income"}</span>
+              )}
+            </button>
+          )}
         </div>
       </SlidePanel>
 
@@ -348,12 +498,35 @@ export default function AdminFinances() {
         </div>
       </div>
 
-      {/* Mobile filter FAB */}
+      {/* Mobile filter FAB — left side */}
       <button onClick={() => setShowMobileFilters(true)}
-        className="md:hidden fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-[var(--accent)] text-[#0a0a0a] shadow-lg flex items-center justify-center">
+        className="md:hidden fixed bottom-6 left-6 z-[60] w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm border border-[var(--border)] text-[var(--text)] shadow-lg flex items-center justify-center">
         <i className="fa-solid fa-sliders text-lg" />
         {hasActiveFilters && <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[0.6rem] flex items-center justify-center font-bold">!</span>}
       </button>
+
+      {/* Mobile add FAB — right side with speed dial */}
+      <div className="md:hidden fixed bottom-6 right-6 z-[60]">
+        {showAddMenu && (
+          <>
+            <div className="fixed inset-0 z-[-1]" onClick={() => setShowAddMenu(false)} />
+            <div className="absolute bottom-16 right-0 flex flex-col gap-2 items-end mb-2">
+              <button onClick={() => { setShowAddMenu(false); openForm("income"); }}
+                className="flex items-center gap-2 bg-green-500 text-[#0a0a0a] rounded-full pl-4 pr-5 py-2.5 shadow-lg text-sm font-semibold whitespace-nowrap">
+                <i className="fa-solid fa-arrow-trend-up text-xs" /> Income
+              </button>
+              <button onClick={() => { setShowAddMenu(false); openForm("expense"); }}
+                className="flex items-center gap-2 bg-red-400 text-[#0a0a0a] rounded-full pl-4 pr-5 py-2.5 shadow-lg text-sm font-semibold whitespace-nowrap">
+                <i className="fa-solid fa-arrow-trend-down text-xs" /> Expense
+              </button>
+            </div>
+          </>
+        )}
+        <button onClick={() => setShowAddMenu(!showAddMenu)}
+          className={`w-14 h-14 rounded-full bg-[var(--accent)] text-[#0a0a0a] shadow-lg flex items-center justify-center transition-transform duration-200 ${showAddMenu ? "rotate-45" : ""}`}>
+          <i className="fa-solid fa-plus text-lg" />
+        </button>
+      </div>
 
       {/* Mobile filter bottom sheet */}
       <div className={`md:hidden fixed inset-0 z-[70] transition-opacity duration-300 ${showMobileFilters ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
@@ -443,11 +616,12 @@ export default function AdminFinances() {
                     <th className="cursor-pointer select-none" onClick={() => toggleSort("date")}>
                       Date <i className={`fa-solid ${sortIcon("date")} ml-1 text-[0.6rem]`} />
                     </th>
+                    <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedIncome.map((i) => (
-                    <tr key={i.id}>
+                    <tr key={i.id} className="cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => openEditIncome(i)}>
                       <td className="font-medium">{i.title}</td>
                       <td className="text-green-400 whitespace-nowrap">
                         {fmtAmount(Math.round(toBase(Number(i.amount), i.currency)), baseCurrency)}
@@ -456,46 +630,28 @@ export default function AdminFinances() {
                       <td><span className="status-badge status-accepted">{sourceLabels[i.source] || i.source}</span></td>
                       <td className="text-[var(--text-dim)] text-xs">{i.project_id ? projectMap[i.project_id] || "—" : "—"}</td>
                       <td className="text-[var(--text-dim)] text-xs">{i.date}</td>
+                      <td><i className="fa-solid fa-pen text-[0.6rem] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors" /></td>
                     </tr>
                   ))}
-                  {filteredIncome.length === 0 && <tr><td colSpan={5} className="text-center text-[var(--text-dim)] py-6">No income records.</td></tr>}
+                  {filteredIncome.length === 0 && <tr><td colSpan={6} className="text-center text-[var(--text-dim)] py-6">No income records.</td></tr>}
                 </tbody>
                 {filteredIncome.length > 0 && (
                   <tfoot>
                     <tr className="border-t border-[var(--border)]">
                       <td className="font-semibold text-xs uppercase tracking-wide text-[var(--text-dim)] py-3">Total</td>
                       <td className="text-green-400 font-semibold whitespace-nowrap py-3">{fmtAmount(Math.round(totalIncome), baseCurrency)}</td>
-                      <td colSpan={3} />
+                      <td colSpan={4} />
                     </tr>
                   </tfoot>
                 )}
               </table>
             </div>
-            {incomePages > 1 && (
-              <div className="flex items-center justify-between mt-3 px-1">
-                <span className="text-xs text-[var(--text-dim)]">Page {incomePage} of {incomePages}</span>
-                <div className="flex gap-1">
-                  <button onClick={() => setIncomePage((p) => Math.max(1, p - 1))} disabled={incomePage === 1}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-left" />
-                  </button>
-                  {Array.from({ length: incomePages }, (_, i) => (
-                    <button key={i} onClick={() => setIncomePage(i + 1)}
-                      className={`w-8 h-8 rounded-lg border text-xs transition-colors ${incomePage === i + 1 ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)]"}`}>
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button onClick={() => setIncomePage((p) => Math.min(incomePages, p + 1))} disabled={incomePage === incomePages}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-right" />
-                  </button>
-                </div>
-              </div>
-            )}
+            {renderPagination(incomePage, incomePages, setIncomePage)}
           </div>
           <div className="md:hidden flex flex-col gap-3">
             {paginatedIncome.map((i) => (
-              <div key={i.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+              <div key={i.id} onClick={() => openEditIncome(i)}
+                className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 cursor-pointer active:bg-white/[0.06] transition-colors">
                 <div className="flex justify-between items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -521,27 +677,7 @@ export default function AdminFinances() {
               </div>
             )}
             {filteredIncome.length === 0 && <div className="text-center text-[var(--text-dim)] py-6">No income records.</div>}
-            {incomePages > 1 && (
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-[var(--text-dim)]">Page {incomePage} of {incomePages}</span>
-                <div className="flex gap-1">
-                  <button onClick={() => setIncomePage((p) => Math.max(1, p - 1))} disabled={incomePage === 1}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-left" />
-                  </button>
-                  {Array.from({ length: incomePages }, (_, i) => (
-                    <button key={i} onClick={() => setIncomePage(i + 1)}
-                      className={`w-8 h-8 rounded-lg border text-xs transition-colors ${incomePage === i + 1 ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)]"}`}>
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button onClick={() => setIncomePage((p) => Math.min(incomePages, p + 1))} disabled={incomePage === incomePages}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-right" />
-                  </button>
-                </div>
-              </div>
-            )}
+            {renderPagination(incomePage, incomePages, setIncomePage)}
           </div>
         </div>
 
@@ -575,11 +711,12 @@ export default function AdminFinances() {
                     <th className="cursor-pointer select-none" onClick={() => toggleSort("date")}>
                       Date <i className={`fa-solid ${sortIcon("date")} ml-1 text-[0.6rem]`} />
                     </th>
+                    <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedExpenses.map((e) => (
-                    <tr key={e.id}>
+                    <tr key={e.id} className="cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => openEditExpense(e)}>
                       <td className="font-medium">{e.title}</td>
                       <td className="text-red-400 whitespace-nowrap">
                         {fmtAmount(Math.round(toBase(Number(e.amount), e.currency)), baseCurrency)}
@@ -588,46 +725,28 @@ export default function AdminFinances() {
                       <td><span className="status-badge status-declined">{categoryLabels[e.category] || e.category}</span></td>
                       <td className="text-[var(--text-dim)] text-xs">{e.project_id ? projectMap[e.project_id] || "—" : "—"}</td>
                       <td className="text-[var(--text-dim)] text-xs">{e.date}</td>
+                      <td><i className="fa-solid fa-pen text-[0.6rem] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors" /></td>
                     </tr>
                   ))}
-                  {filteredExpenses.length === 0 && <tr><td colSpan={5} className="text-center text-[var(--text-dim)] py-6">No expense records.</td></tr>}
+                  {filteredExpenses.length === 0 && <tr><td colSpan={6} className="text-center text-[var(--text-dim)] py-6">No expense records.</td></tr>}
                 </tbody>
                 {filteredExpenses.length > 0 && (
                   <tfoot>
                     <tr className="border-t border-[var(--border)]">
                       <td className="font-semibold text-xs uppercase tracking-wide text-[var(--text-dim)] py-3">Total</td>
                       <td className="text-red-400 font-semibold whitespace-nowrap py-3">{fmtAmount(Math.round(totalExpenses), baseCurrency)}</td>
-                      <td colSpan={3} />
+                      <td colSpan={4} />
                     </tr>
                   </tfoot>
                 )}
               </table>
             </div>
-            {expensePages > 1 && (
-              <div className="flex items-center justify-between mt-3 px-1">
-                <span className="text-xs text-[var(--text-dim)]">Page {expensePage} of {expensePages}</span>
-                <div className="flex gap-1">
-                  <button onClick={() => setExpensePage((p) => Math.max(1, p - 1))} disabled={expensePage === 1}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-left" />
-                  </button>
-                  {Array.from({ length: expensePages }, (_, i) => (
-                    <button key={i} onClick={() => setExpensePage(i + 1)}
-                      className={`w-8 h-8 rounded-lg border text-xs transition-colors ${expensePage === i + 1 ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)]"}`}>
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button onClick={() => setExpensePage((p) => Math.min(expensePages, p + 1))} disabled={expensePage === expensePages}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-right" />
-                  </button>
-                </div>
-              </div>
-            )}
+            {renderPagination(expensePage, expensePages, setExpensePage)}
           </div>
           <div className="md:hidden flex flex-col gap-3">
             {paginatedExpenses.map((e) => (
-              <div key={e.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+              <div key={e.id} onClick={() => openEditExpense(e)}
+                className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 cursor-pointer active:bg-white/[0.06] transition-colors">
                 <div className="flex justify-between items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -653,27 +772,7 @@ export default function AdminFinances() {
               </div>
             )}
             {filteredExpenses.length === 0 && <div className="text-center text-[var(--text-dim)] py-6">No expense records.</div>}
-            {expensePages > 1 && (
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-[var(--text-dim)]">Page {expensePage} of {expensePages}</span>
-                <div className="flex gap-1">
-                  <button onClick={() => setExpensePage((p) => Math.max(1, p - 1))} disabled={expensePage === 1}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-left" />
-                  </button>
-                  {Array.from({ length: expensePages }, (_, i) => (
-                    <button key={i} onClick={() => setExpensePage(i + 1)}
-                      className={`w-8 h-8 rounded-lg border text-xs transition-colors ${expensePage === i + 1 ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)]"}`}>
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button onClick={() => setExpensePage((p) => Math.min(expensePages, p + 1))} disabled={expensePage === expensePages}
-                    className="w-8 h-8 rounded-lg border border-[var(--border)] text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors disabled:opacity-30 disabled:pointer-events-none">
-                    <i className="fa-solid fa-chevron-right" />
-                  </button>
-                </div>
-              </div>
-            )}
+            {renderPagination(expensePage, expensePages, setExpensePage)}
           </div>
         </div>
       </div>
