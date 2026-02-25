@@ -46,7 +46,7 @@ export default function QuoteDetail() {
   };
 
   const deleteQuote = async () => {
-    if (!confirm("Are you sure you want to delete this quote?")) return;
+    if (!confirm("Are you sure you want to delete this quote request?")) return;
     await supabase.from("quotes").delete().eq("id", id);
     router.push("/admin/quotes");
   };
@@ -62,8 +62,8 @@ export default function QuoteDetail() {
   if (!quote) {
     return (
       <div className="text-center py-20">
-        <div className="text-[var(--text-dim)] mb-4">Quote not found.</div>
-        <Link href="/admin/quotes" className="text-[var(--accent)] hover:underline text-sm">Back to Quotes</Link>
+        <div className="text-[var(--text-dim)] mb-4">Quote request not found.</div>
+        <Link href="/admin/quotes" className="text-[var(--accent)] hover:underline text-sm">Back to Quote Requests</Link>
       </div>
     );
   }
@@ -71,7 +71,7 @@ export default function QuoteDetail() {
   return (
     <div>
       <Link href="/admin/quotes" className="inline-flex items-center gap-2 text-sm text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors mb-6">
-        <i className="fa-solid fa-arrow-left" /> Back to Quotes
+        <i className="fa-solid fa-arrow-left" /> Back to Quote Requests
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
@@ -97,7 +97,7 @@ export default function QuoteDetail() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes about this quote..."
+              placeholder="Add notes about this quote request..."
               rows={4}
               className="w-full bg-white/[0.04] border border-[var(--border)] rounded-lg px-4 py-3 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-white/20 resize-none"
             />
@@ -163,7 +163,7 @@ export default function QuoteDetail() {
               </a>
               <button onClick={deleteQuote}
                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-red-500/20 text-red-400 text-sm font-semibold hover:bg-red-500/5 transition-colors">
-                <i className="fa-solid fa-trash" /> Delete Quote
+                <i className="fa-solid fa-trash" /> Delete Request
               </button>
             </div>
           </div>

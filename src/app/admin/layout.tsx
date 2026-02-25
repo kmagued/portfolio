@@ -8,7 +8,7 @@ import { CurrencyProvider, useCurrency, currencies } from "@/lib/currency-contex
 
 const navLinks = [
   { href: "/admin", label: "Overview", icon: "fa-chart-pie" },
-  { href: "/admin/quotes", label: "Quotes", icon: "fa-file-lines" },
+  { href: "/admin/quotes", label: "Quote Requests", icon: "fa-file-lines" },
   { href: "/admin/projects", label: "Projects", icon: "fa-folder" },
   { href: "/admin/finances", label: "Finances", icon: "fa-wallet" },
 ];

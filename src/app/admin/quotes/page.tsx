@@ -31,7 +31,7 @@ export default function AdminQuotes() {
 
   return (
     <div>
-      <h1 className="font-display text-4xl tracking-wide mb-2">QUOTES</h1>
+      <h1 className="font-display text-4xl tracking-wide mb-2">QUOTE REQUESTS</h1>
       <p className="text-sm text-[var(--text-dim)] mb-8">Manage incoming quote requests from your portfolio.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -82,7 +82,7 @@ export default function AdminQuotes() {
           </Link>
         ))}
       </div>
-      {quotes.length === 0 && <div className="text-center text-[var(--text-dim)] py-12">No quotes yet.</div>}
+      {quotes.length === 0 && <div className="text-center text-[var(--text-dim)] py-12">No quote requests yet.</div>}
     </div>
   );
 }

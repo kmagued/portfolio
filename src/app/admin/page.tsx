@@ -143,7 +143,7 @@ export default function AdminOverview() {
 
   const maxChartVal = Math.max(...chartData.flatMap((d) => [d.income, d.expenses]), 1);
   const barCount = chartData.length;
-  const chartWidth = Math.max(400, 80 + barCount * 90);
+  const chartWidth = Math.max(800, 80 + barCount * 90);
 
   return (
     <div>
@@ -203,7 +203,7 @@ export default function AdminOverview() {
         <div className="admin-stat blue">
           <div className="flex justify-between items-start">
             <div>
-              <div className="text-xs text-[var(--text-dim)] uppercase tracking-wide font-semibold mb-1">New Quotes</div>
+              <div className="text-xs text-[var(--text-dim)] uppercase tracking-wide font-semibold mb-1">New Requests</div>
               <div className="font-display text-3xl tracking-wide">{newQuotes}</div>
             </div>
             <i className="fa-solid fa-file-lines text-xl text-[var(--text-dim)]/30" />
@@ -265,8 +265,12 @@ export default function AdminOverview() {
               const expH = maxChartVal > 0 ? (d.expenses / maxChartVal) * 160 : 0;
               return (
                 <g key={d.key}>
-                  <rect x={groupX} y={180 - incH} width={barW} height={Math.max(incH, 0)} rx="4" fill="#22c55e" opacity="0.85" />
-                  <rect x={groupX + barW + 4} y={180 - expH} width={barW} height={Math.max(expH, 0)} rx="4" fill="#ef4444" opacity="0.85" />
+                  <rect x={groupX} y={180 - incH} width={barW} height={Math.max(incH, 0)} rx="4" fill="#22c55e" opacity="0.85" className="hover:opacity-100 transition-opacity cursor-pointer">
+                    <title>{d.label} Income: {fmtAmount(Math.round(d.income))}</title>
+                  </rect>
+                  <rect x={groupX + barW + 4} y={180 - expH} width={barW} height={Math.max(expH, 0)} rx="4" fill="#ef4444" opacity="0.85" className="hover:opacity-100 transition-opacity cursor-pointer">
+                    <title>{d.label} Expenses: {fmtAmount(Math.round(d.expenses))}</title>
+                  </rect>
                   <text x={groupX + barW + 2} y="200" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="10" fontFamily="monospace">
                     {d.label}
                   </text>
@@ -280,7 +284,7 @@ export default function AdminOverview() {
       {/* Recent quotes */}
       <div className="admin-card">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-display text-xl tracking-wide">RECENT QUOTES</h3>
+          <h3 className="font-display text-xl tracking-wide">RECENT REQUESTS</h3>
           <Link href="/admin/quotes" className="text-xs text-[var(--accent)] hover:underline">View all</Link>
         </div>
 
@@ -298,7 +302,7 @@ export default function AdminOverview() {
                   <td className="text-[var(--text-dim)] text-xs">{new Date(q.created_at).toLocaleDateString()}</td>
                 </tr>
               ))}
-              {quotes.length === 0 && <tr><td colSpan={5} className="text-center text-[var(--text-dim)] py-8">No quotes yet. They&apos;ll appear here when someone submits the form.</td></tr>}
+              {quotes.length === 0 && <tr><td colSpan={5} className="text-center text-[var(--text-dim)] py-8">No quote requests yet. They&apos;ll appear here when someone submits the form.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -318,7 +322,7 @@ export default function AdminOverview() {
               </div>
             </div>
           ))}
-          {quotes.length === 0 && <div className="text-center text-[var(--text-dim)] py-8">No quotes yet.</div>}
+          {quotes.length === 0 && <div className="text-center text-[var(--text-dim)] py-8">No quote requests yet.</div>}
         </div>
       </div>
     </div>
